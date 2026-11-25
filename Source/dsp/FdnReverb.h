@@ -158,7 +158,7 @@ public:
 
     static constexpr double kMaxSupportedSampleRate = 192000.0;
     static constexpr double kBaseSampleRate = 44100.0;
-    static constexpr float kMaxPreDelayMs = 100.0f;
+    static constexpr float kMaxPreDelayMs = 500.0f;
 
     // 44.1 kHz base prime delay lengths for DENSE (8ch FDN)
     static constexpr std::array<int, 8> kDenseBaseDelays = {
@@ -214,6 +214,8 @@ public:
         lastMetalSizeFactor = -1.0f;
         lastMetalDecaySec = -1.0f;
 
+        lofiHoldInterval = std::max(1, static_cast<int>(std::round(sampleRate / 14700.0)));
+
         reset();
         updateFilters(120.0f, 12000.0f);
     }
@@ -240,6 +242,12 @@ public:
         for (auto& f : metalDampR) f.reset();
         for (auto& ap : metalAllpassL) ap.reset();
         for (auto& ap : metalAllpassR) ap.reset();
+
+        lofiCounterDense = 0;
+        lofiHoldDense.fill(0.0f);
+        lofiCounterMetal = 0;
+        lofiHoldMetalL.fill(0.0f);
+        lofiHoldMetalR.fill(0.0f);
     }
 
     void setAlgorithm(Algorithm newAlgo) noexcept
@@ -286,10 +294,12 @@ public:
     inline void processSample(float inL, float inR,
                               float preDelayMs, float sizePercent,
                               float decaySec, float dampingPercent,
+                              bool lofiEnabled,
                               float& outL, float& outR) noexcept
     {
         // 1. Pre-Delay (read-before-write with continuous linear interpolation down to 0 ms)
-        const float preDelaySamples = std::max(0.0f, preDelayMs * 0.001f * static_cast<float>(sampleRate));
+        const float clampedPreDelayMs = std::clamp(preDelayMs, 0.0f, kMaxPreDelayMs);
+        const float preDelaySamples = std::max(0.0f, clampedPreDelayMs * 0.001f * static_cast<float>(sampleRate));
         float pdL = inL;
         float pdR = inR;
         if (preDelaySamples >= 1.0f)
@@ -319,15 +329,23 @@ public:
 
         if (currentAlgo == Algorithm::Dense)
         {
-            processDense(filtL, filtR, sizeFactor, safeDecay, dampAlpha, srRatio, outL, outR);
+            processDense(filtL, filtR, sizeFactor, safeDecay, dampAlpha, srRatio, lofiEnabled, outL, outR);
         }
         else
         {
-            processMetal(filtL, filtR, sizeFactor, safeDecay, dampAlpha, srRatio, outL, outR);
+            processMetal(filtL, filtR, sizeFactor, safeDecay, dampAlpha, srRatio, lofiEnabled, outL, outR);
         }
     }
 
 private:
+    static inline float quantizeLoFi(float x) noexcept
+    {
+        if (std::abs(x) < 1.0e-4f)
+            return 0.0f;
+        constexpr float levels = 384.0f; // ~9.5-10 bit feedback quantization (trunc avoids limit cycles)
+        return std::trunc(x * levels) / levels;
+    }
+
     inline float computeFeedbackGain(float delaySamples, float decaySec) const noexcept
     {
         const float tau = delaySamples / static_cast<float>(sampleRate);
@@ -336,6 +354,7 @@ private:
 
     inline void processDense(float inL, float inR,
                              float sizeFactor, float decaySec, float dampAlpha, float srRatio,
+                             bool lofiEnabled,
                              float& outL, float& outR) noexcept
     {
         if (std::abs(sizeFactor - lastDenseSizeFactor) > 1.0e-5f
@@ -356,6 +375,18 @@ private:
         {
             const float raw = denseDelays[static_cast<size_t>(i)].readLinear(cachedDenseLen[static_cast<size_t>(i)]);
             dOut[static_cast<size_t>(i)] = denseDamp[static_cast<size_t>(i)].process(raw, dampAlpha);
+        }
+
+        if (lofiEnabled)
+        {
+            if (lofiCounterDense == 0)
+            {
+                for (int i = 0; i < 8; ++i)
+                    lofiHoldDense[static_cast<size_t>(i)] = quantizeLoFi(dOut[static_cast<size_t>(i)]);
+            }
+            if (++lofiCounterDense >= lofiHoldInterval)
+                lofiCounterDense = 0;
+            dOut = lofiHoldDense;
         }
 
         // 8-point Fast Walsh-Hadamard Transform (FWHT)
@@ -404,6 +435,7 @@ private:
 
     inline void processMetal(float inL, float inR,
                              float sizeFactor, float decaySec, float dampAlpha, float srRatio,
+                             bool lofiEnabled,
                              float& outL, float& outR) noexcept
     {
         if (std::abs(sizeFactor - lastMetalSizeFactor) > 1.0e-5f
@@ -435,16 +467,30 @@ private:
         float sumR = 0.0f;
 
         // 4 parallel feedback comb filters per channel (linear interpolation to avoid zipper noise)
+        const bool updateLofiMetal = (lofiEnabled && lofiCounterMetal == 0);
         for (int i = 0; i < 4; ++i)
         {
             const float lenL = cachedMetalCombLenL[static_cast<size_t>(i)];
             const float lenR = cachedMetalCombLenR[static_cast<size_t>(i)];
 
-            const float cOutL = metalCombL[static_cast<size_t>(i)].readLinear(lenL);
-            const float cOutR = metalCombR[static_cast<size_t>(i)].readLinear(lenR);
+            float cOutL = metalCombL[static_cast<size_t>(i)].readLinear(lenL);
+            float cOutR = metalCombR[static_cast<size_t>(i)].readLinear(lenR);
 
-            const float dampL = metalDampL[static_cast<size_t>(i)].process(cOutL, dampAlpha);
-            const float dampR = metalDampR[static_cast<size_t>(i)].process(cOutR, dampAlpha);
+            float dampL = metalDampL[static_cast<size_t>(i)].process(cOutL, dampAlpha);
+            float dampR = metalDampR[static_cast<size_t>(i)].process(cOutR, dampAlpha);
+
+            if (lofiEnabled)
+            {
+                if (updateLofiMetal)
+                {
+                    lofiHoldMetalL[static_cast<size_t>(i)] = quantizeLoFi(dampL);
+                    lofiHoldMetalR[static_cast<size_t>(i)] = quantizeLoFi(dampR);
+                }
+                dampL = lofiHoldMetalL[static_cast<size_t>(i)];
+                dampR = lofiHoldMetalR[static_cast<size_t>(i)];
+                cOutL = dampL;
+                cOutR = dampR;
+            }
 
             metalCombL[static_cast<size_t>(i)].push(inL + cachedMetalCombGL[static_cast<size_t>(i)] * dampL);
             metalCombR[static_cast<size_t>(i)].push(inR + cachedMetalCombGR[static_cast<size_t>(i)] * dampR);
@@ -452,6 +498,8 @@ private:
             sumL += cOutL;
             sumR += cOutR;
         }
+        if (lofiEnabled && ++lofiCounterMetal >= lofiHoldInterval)
+            lofiCounterMetal = 0;
 
         // Gain-matched normalization for 4 parallel combs (closer to DENSE RMS)
         float sigL = sumL * 0.38f;
@@ -514,6 +562,14 @@ private:
     std::array<float, 4> cachedMetalCombGR {};
     std::array<float, 2> cachedMetalApLenL {};
     std::array<float, 2> cachedMetalApLenR {};
+
+    // Feedback Lo-Fi state
+    int lofiHoldInterval = 3;
+    int lofiCounterDense = 0;
+    std::array<float, 8> lofiHoldDense {};
+    int lofiCounterMetal = 0;
+    std::array<float, 4> lofiHoldMetalL {};
+    std::array<float, 4> lofiHoldMetalR {};
 };
 
 } // namespace sdverb

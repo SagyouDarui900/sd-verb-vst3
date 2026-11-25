@@ -12,7 +12,9 @@ struct FactoryPreset
     int algo;           // 0 = DENSE, 1 = METAL
     float size;         // 10..100 %
     float decay;        // 0.05..5.0 s
+    bool pdlySync;
     float predelay;     // 0..100 ms
+    int pdlyRate;       // 0..5 (1/64, 1/32, 1/16T, 1/16, 1/8T, 1/8)
     float damping;      // 0..100 %
     float inHpf;        // 20..1000 Hz
     float inLpf;        // 1000..20000 Hz
@@ -23,19 +25,22 @@ struct FactoryPreset
     int gateRate;       // 0..5 (1/32, 1/16, 1/8, 1/4, 1/16T, 1/8D)
     float gateRel;      // 5..300 ms
     float duckAmount;   // 0..100 %
+    bool lofiEnabled;
     float width;        // 0..200 %
     float mix;          // 0..100 %
 };
 
 constexpr FactoryPreset kFactoryPresets[] = {
-    { "Default (Init)",                 0, 35.0f, 0.80f, 10.0f, 40.0f, 120.0f, 12000.0f, false, -24.0f, false,  80.0f, 1,  30.0f,  0.0f, 100.0f, 30.0f },
-    { "Main Lead - Tight Ducking",      0, 38.0f, 0.75f, 12.0f, 35.0f, 220.0f, 11000.0f, false, -24.0f, false,  80.0f, 1,  30.0f, 55.0f, 115.0f, 28.0f },
-    { "Main Lead - 1/16 Gate",          0, 42.0f, 1.10f,  0.0f, 30.0f, 250.0f, 12000.0f, true,  -28.0f, true,   80.0f, 1,  25.0f, 20.0f, 120.0f, 32.0f },
-    { "Harmony / Backing - Wide",       0, 55.0f, 1.15f, 18.0f, 55.0f, 300.0f,  8500.0f, false, -24.0f, false,  80.0f, 1,  30.0f, 30.0f, 165.0f, 35.0f },
-    { "Vocal - Short Room + Duck",      0, 40.0f, 0.90f, 20.0f, 45.0f, 180.0f,  9500.0f, false, -24.0f, false,  80.0f, 1,  30.0f, 45.0f, 110.0f, 26.0f },
-    { "Drum Snare - Gated Metal",       1, 52.0f, 1.60f,  5.0f, 20.0f, 200.0f, 14000.0f, true,  -26.0f, false, 120.0f, 1,  35.0f,  0.0f, 135.0f, 38.0f },
-    { "Drum Kit - Tight Room",          0, 22.0f, 0.38f,  4.0f, 50.0f, 160.0f,  9000.0f, false, -24.0f, false,  80.0f, 1,  30.0f, 15.0f,  90.0f, 20.0f },
-    { "SE / Synth Hit - Metallic Tail", 1, 78.0f, 2.40f, 15.0f, 15.0f, 140.0f, 16000.0f, false, -24.0f, false,  80.0f, 1,  30.0f,  0.0f, 150.0f, 40.0f }
+    { "Default (Init)",                 0, 35.0f, 0.80f, false, 10.0f, 1, 40.0f, 120.0f, 12000.0f, false, -24.0f, false,  80.0f, 1,  30.0f,  0.0f, false, 100.0f, 30.0f },
+    { "Main Lead - Tight Ducking",      0, 38.0f, 0.75f, false, 12.0f, 1, 35.0f, 220.0f, 11000.0f, false, -24.0f, false,  80.0f, 1,  30.0f, 55.0f, false, 115.0f, 28.0f },
+    { "Main Lead - 1/16 Gate",          0, 42.0f, 1.10f, false,  0.0f, 1, 30.0f, 250.0f, 12000.0f, true,  -28.0f, true,   80.0f, 1,  25.0f, 20.0f, false, 120.0f, 32.0f },
+    { "Harmony / Backing - Wide",       0, 55.0f, 1.15f, false, 18.0f, 1, 55.0f, 300.0f,  8500.0f, false, -24.0f, false,  80.0f, 1,  30.0f, 30.0f, false, 165.0f, 35.0f },
+    { "Vocal - Short Room + Duck",      0, 40.0f, 0.90f, false, 20.0f, 1, 45.0f, 180.0f,  9500.0f, false, -24.0f, false,  80.0f, 1,  30.0f, 45.0f, false, 110.0f, 26.0f },
+    { "Drum Snare - Gated Metal",       1, 52.0f, 1.60f, false,  5.0f, 1, 20.0f, 200.0f, 14000.0f, true,  -26.0f, false, 120.0f, 1,  35.0f,  0.0f, false, 135.0f, 38.0f },
+    { "Drum Kit - Tight Room",          0, 22.0f, 0.38f, false,  4.0f, 1, 50.0f, 160.0f,  9000.0f, false, -24.0f, false,  80.0f, 1,  30.0f, 15.0f, false,  90.0f, 20.0f },
+    { "SE / Synth Hit - Metallic Tail", 1, 78.0f, 2.40f, false, 15.0f, 1, 15.0f, 140.0f, 16000.0f, false, -24.0f, false,  80.0f, 1,  30.0f,  0.0f, false, 150.0f, 40.0f },
+    { "Main Lead - 1/16 Sync Pre-Delay",0, 36.0f, 0.65f, true,  10.0f, 3, 35.0f, 220.0f, 12000.0f, false, -24.0f, false,  80.0f, 1,  30.0f, 40.0f, false, 120.0f, 32.0f },
+    { "SE / Retro - Lo-Fi Metal",       1, 65.0f, 1.80f, false,  8.0f, 1, 30.0f, 240.0f, 10000.0f, true,  -28.0f, true,   80.0f, 2,  35.0f,  0.0f, true,  140.0f, 38.0f }
 };
 
 constexpr int kNumFactoryPresets = static_cast<int>(sizeof(kFactoryPresets) / sizeof(kFactoryPresets[0]));
@@ -50,7 +55,9 @@ SDVerbAudioProcessor::SDVerbAudioProcessor()
     algoParam        = apvts.getRawParameterValue("algo");
     sizeParam        = apvts.getRawParameterValue("size");
     decayParam       = apvts.getRawParameterValue("decay");
+    pdlySyncParam    = apvts.getRawParameterValue("pdly_sync");
     predelayParam    = apvts.getRawParameterValue("predelay");
+    pdlyRateParam    = apvts.getRawParameterValue("pdly_rate");
     dampingParam     = apvts.getRawParameterValue("damping");
     inHpfParam       = apvts.getRawParameterValue("in_hpf");
     inLpfParam       = apvts.getRawParameterValue("in_lpf");
@@ -61,6 +68,7 @@ SDVerbAudioProcessor::SDVerbAudioProcessor()
     gateRateParam    = apvts.getRawParameterValue("gate_rate");
     gateRelParam     = apvts.getRawParameterValue("gate_rel");
     duckAmountParam  = apvts.getRawParameterValue("duck_amount");
+    lofiEnabledParam = apvts.getRawParameterValue("lofi_enabled");
     widthParam       = apvts.getRawParameterValue("width");
     mixParam         = apvts.getRawParameterValue("mix");
 }
@@ -83,10 +91,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout SDVerbAudioProcessor::create
         juce::NormalisableRange<float>(0.05f, 5.0f, 0.01f, 0.45f), 0.80f,
         juce::AudioParameterFloatAttributes().withLabel("s")));
 
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID("pdly_sync", 1), "Pre-Delay Sync", false));
+
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID("predelay", 1), "Pre-Delay",
         juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f), 10.0f,
         juce::AudioParameterFloatAttributes().withLabel("ms")));
+
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID("pdly_rate", 1), "Pre-Delay Rate",
+        juce::StringArray { "1/64", "1/32", "1/16T", "1/16", "1/8T", "1/8" }, 1));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID("damping", 1), "Damping",
@@ -132,6 +147,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout SDVerbAudioProcessor::create
         juce::ParameterID("duck_amount", 1), "Ducking",
         juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f), 0.0f,
         juce::AudioParameterFloatAttributes().withLabel("%")));
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID("lofi_enabled", 1), "Lo-Fi Feedback", false));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID("width", 1), "Width",
@@ -228,6 +246,20 @@ float SDVerbAudioProcessor::getRateBeats(int rateIndex) noexcept
     }
 }
 
+float SDVerbAudioProcessor::getPreDelayRateBeats(int rateIndex) noexcept
+{
+    switch (rateIndex)
+    {
+        case 0: return 0.0625f;         // 1/64
+        case 1: return 0.125f;          // 1/32
+        case 2: return 1.0f / 6.0f;     // 1/16T
+        case 3: return 0.25f;           // 1/16
+        case 4: return 1.0f / 3.0f;     // 1/8T
+        case 5: return 0.5f;            // 1/8
+        default: return 0.125f;
+    }
+}
+
 void SDVerbAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
@@ -258,6 +290,9 @@ void SDVerbAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
     widthSmooth.setTargetValue(widthParam->load());
     mixSmooth.setTargetValue(mixParam->load());
 
+    const bool pdlySync    = pdlySyncParam->load() >= 0.5f;
+    const int  pdlyRateIdx = static_cast<int>(pdlyRateParam->load());
+    const bool lofiEnabled = lofiEnabledParam->load() >= 0.5f;
     const bool gateEnabled = gateEnabledParam->load() >= 0.5f;
     const bool gateSync    = gateSyncParam->load() >= 0.5f;
     const int  gateRateIdx = static_cast<int>(gateRateParam->load());
@@ -287,6 +322,10 @@ void SDVerbAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
     const int syncHoldSamples = gateSync
         ? static_cast<int>(std::round((60.0 / bpm) * static_cast<double>(getRateBeats(gateRateIdx)) * sr))
         : 0;
+    const float syncPreDelayMs = pdlySync
+        ? std::clamp(static_cast<float>((60.0 / bpm) * static_cast<double>(getPreDelayRateBeats(pdlyRateIdx)) * 1000.0),
+                     0.0f, sdverb::FdnReverb::kMaxPreDelayMs)
+        : 0.0f;
 
     sdverb::GateDucker::ProcessResult lastGdResult {};
 
@@ -297,7 +336,7 @@ void SDVerbAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
 
         const float curSize       = sizeSmooth.getNextValue();
         const float curDecay      = decaySmooth.getNextValue();
-        const float curPredelay   = predelaySmooth.getNextValue();
+        const float curPredelay   = pdlySync ? syncPreDelayMs : predelaySmooth.getNextValue();
         const float curDamping    = dampingSmooth.getNextValue();
         const float curHpf        = inHpfSmooth.getNextValue();
         const float curLpf        = inLpfSmooth.getNextValue();
@@ -319,7 +358,7 @@ void SDVerbAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
         // 1. Reverb Core
         float wetL = 0.0f;
         float wetR = 0.0f;
-        reverbEngine.processSample(dryL, dryR, curPredelay, curSize, curDecay, curDamping, wetL, wetR);
+        reverbEngine.processSample(dryL, dryR, curPredelay, curSize, curDecay, curDamping, lofiEnabled, wetL, wetR);
 
         // 2. Envelope Follower + Gate & Hold + Ducking
         lastGdResult = gateDucker.processSample(dryL, dryR, gateEnabled, curGateThresh, holdSamples, curGateRelMs, curDuckAmt);
@@ -405,7 +444,9 @@ void SDVerbAudioProcessor::setCurrentProgram(int index)
     setParamValue("algo",         static_cast<float>(p.algo));
     setParamValue("size",         p.size);
     setParamValue("decay",        p.decay);
+    setParamValue("pdly_sync",    p.pdlySync ? 1.0f : 0.0f);
     setParamValue("predelay",     p.predelay);
+    setParamValue("pdly_rate",    static_cast<float>(p.pdlyRate));
     setParamValue("damping",      p.damping);
     setParamValue("in_hpf",       p.inHpf);
     setParamValue("in_lpf",       p.inLpf);
@@ -416,6 +457,7 @@ void SDVerbAudioProcessor::setCurrentProgram(int index)
     setParamValue("gate_rate",    static_cast<float>(p.gateRate));
     setParamValue("gate_rel",     p.gateRel);
     setParamValue("duck_amount",  p.duckAmount);
+    setParamValue("lofi_enabled", p.lofiEnabled ? 1.0f : 0.0f);
     setParamValue("width",        p.width);
     setParamValue("mix",          p.mix);
 }

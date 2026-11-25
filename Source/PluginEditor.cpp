@@ -117,6 +117,24 @@ SDVerbAudioProcessorEditor::SDVerbAudioProcessorEditor(SDVerbAudioProcessor& p)
     setupKnob(predelayKnob, "predelay", "PRE-DLY",
               [](double v) { return juce::String(v, 1) + " ms"; },
               parseStandardUnitValue);
+    setupKnob(predelayRateKnob, "pdly_rate", "PRE-DLY",
+              [](double v)
+              {
+                  static const char* kPdlyRates[6] = { "1/64", "1/32", "1/16T", "1/16", "1/8T", "1/8" };
+                  const int idx = juce::jlimit(0, 5, static_cast<int>(std::round(v)));
+                  return juce::String(kPdlyRates[idx]);
+              },
+              [](const juce::String& text) -> double
+              {
+                  static const char* kPdlyRates[6] = { "1/64", "1/32", "1/16T", "1/16", "1/8T", "1/8" };
+                  const auto trimmed = text.trim();
+                  for (int i = 0; i < 6; ++i)
+                  {
+                      if (trimmed.equalsIgnoreCase(kPdlyRates[i]))
+                          return static_cast<double>(i);
+                  }
+                  return trimmed.getDoubleValue();
+              });
     setupKnob(dampingKnob, "damping", "DAMPING",
               [](double v) { return juce::String(v, 1) + " %"; },
               parseStandardUnitValue);
@@ -164,6 +182,16 @@ SDVerbAudioProcessorEditor::SDVerbAudioProcessorEditor(SDVerbAudioProcessor& p)
               parseStandardUnitValue);
 
     // Column 3: TONE & MIX
+    addAndMakeVisible(pdlySyncButton);
+    pdlySyncButton.setClickingTogglesState(true);
+    pdlySyncAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        audioProcessor.getAPVTS(), "pdly_sync", pdlySyncButton);
+
+    addAndMakeVisible(lofiButton);
+    lofiButton.setClickingTogglesState(true);
+    lofiAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        audioProcessor.getAPVTS(), "lofi_enabled", lofiButton);
+
     setupKnob(lowCutKnob, "in_hpf", "LOW CUT",
               [](double v) { return juce::String(static_cast<int>(std::round(v))) + " Hz"; },
               parseFreqUnitValue);
@@ -183,8 +211,9 @@ SDVerbAudioProcessorEditor::SDVerbAudioProcessorEditor(SDVerbAudioProcessor& p)
               parseStandardUnitValue);
 
     // Listen to parameter changes for Shape Guide & Toggle labels
-    for (const auto* id : { "algo", "predelay", "decay", "gate_enabled", "gate_thresh",
-                            "gate_sync", "gate_hold", "gate_rate", "gate_rel", "width" })
+    for (const auto* id : { "algo", "pdly_sync", "predelay", "pdly_rate", "decay",
+                            "gate_enabled", "gate_thresh", "gate_sync", "gate_hold", "gate_rate", "gate_rel",
+                            "lofi_enabled", "width" })
     {
         audioProcessor.getAPVTS().addParameterListener(id, this);
     }
@@ -199,15 +228,16 @@ SDVerbAudioProcessorEditor::~SDVerbAudioProcessorEditor()
 {
     stopTimer();
 
-    for (auto* sl : { &sizeKnob.slider, &decayKnob.slider, &predelayKnob.slider, &dampingKnob.slider,
+    for (auto* sl : { &sizeKnob.slider, &decayKnob.slider, &predelayKnob.slider, &predelayRateKnob.slider, &dampingKnob.slider,
                       &gateThreshKnob.slider, &gateHoldKnob.slider, &gateRateKnob.slider, &gateRelKnob.slider, &duckingKnob.slider,
                       &lowCutKnob.slider, &highCutKnob.slider, &widthKnob.slider, &mixKnob.slider })
     {
         sl->removeMouseListener(this);
     }
 
-    for (const auto* id : { "algo", "predelay", "decay", "gate_enabled", "gate_thresh",
-                            "gate_sync", "gate_hold", "gate_rate", "gate_rel", "width" })
+    for (const auto* id : { "algo", "pdly_sync", "predelay", "pdly_rate", "decay",
+                            "gate_enabled", "gate_thresh", "gate_sync", "gate_hold", "gate_rate", "gate_rel",
+                            "lofi_enabled", "width" })
     {
         audioProcessor.getAPVTS().removeParameterListener(id, this);
     }
@@ -318,6 +348,16 @@ void SDVerbAudioProcessorEditor::updateSidebarReadouts()
     gateRateKnob.slider.setVisible(syncOn);
     gateRateKnob.label.setVisible(syncOn);
 
+    const bool pdlySyncOn = apvts.getRawParameterValue("pdly_sync")->load() >= 0.5f;
+    pdlySyncButton.setButtonText(pdlySyncOn ? "PDLY: SYNC" : "PDLY: OFF");
+    predelayKnob.slider.setVisible(!pdlySyncOn);
+    predelayKnob.label.setVisible(!pdlySyncOn);
+    predelayRateKnob.slider.setVisible(pdlySyncOn);
+    predelayRateKnob.label.setVisible(pdlySyncOn);
+
+    const bool lofiOn = apvts.getRawParameterValue("lofi_enabled")->load() >= 0.5f;
+    lofiButton.setButtonText(lofiOn ? "LO-FI: ON" : "LO-FI: OFF");
+
     lastDecayVal    = apvts.getRawParameterValue("decay")->load();
     lastHoldVal     = apvts.getRawParameterValue("gate_hold")->load();
     lastHoldRateIdx = static_cast<int>(apvts.getRawParameterValue("gate_rate")->load());
@@ -329,7 +369,8 @@ void SDVerbAudioProcessorEditor::updateSidebarReadouts()
 void SDVerbAudioProcessorEditor::updateVisualizerShape()
 {
     auto& apvts = audioProcessor.getAPVTS();
-    const float predelay   = apvts.getRawParameterValue("predelay")->load();
+    const bool  pdlySyncOn = apvts.getRawParameterValue("pdly_sync")->load() >= 0.5f;
+    float predelay         = apvts.getRawParameterValue("predelay")->load();
     const float decay      = apvts.getRawParameterValue("decay")->load();
     const bool  gateOn     = apvts.getRawParameterValue("gate_enabled")->load() >= 0.5f;
     const float gateThresh = apvts.getRawParameterValue("gate_thresh")->load();
@@ -338,11 +379,18 @@ void SDVerbAudioProcessorEditor::updateVisualizerShape()
     const float gateRel    = apvts.getRawParameterValue("gate_rel")->load();
     const float width      = apvts.getRawParameterValue("width")->load();
 
+    const double bpm = audioProcessor.getLastKnownBpm();
+    if (pdlySyncOn)
+    {
+        const int rateIdx = static_cast<int>(apvts.getRawParameterValue("pdly_rate")->load());
+        constexpr float pdlyBeatsTable[6] = { 0.0625f, 0.125f, 1.0f / 6.0f, 0.25f, 1.0f / 3.0f, 0.5f };
+        predelay = juce::jlimit(0.0f, 500.0f, static_cast<float>((60.0 / bpm) * pdlyBeatsTable[juce::jlimit(0, 5, rateIdx)] * 1000.0));
+    }
+
     if (syncOn)
     {
         const int rateIdx = static_cast<int>(apvts.getRawParameterValue("gate_rate")->load());
         constexpr float beatsTable[6] = { 0.125f, 0.25f, 0.5f, 1.0f, 1.0f / 6.0f, 0.75f };
-        const double bpm = audioProcessor.getLastKnownBpm();
         holdMs = static_cast<float>((60.0 / bpm) * beatsTable[juce::jlimit(0, 5, rateIdx)] * 1000.0);
     }
 
@@ -361,14 +409,14 @@ void SDVerbAudioProcessorEditor::applyTheme()
     colorThemeButton.setButtonText(isCyanTheme ? "CYN" : "ORG");
 
     const auto& pal = lookAndFeel.getCurrentPalette();
-    for (auto* lbl : { &sizeKnob.label, &decayKnob.label, &predelayKnob.label, &dampingKnob.label,
+    for (auto* lbl : { &sizeKnob.label, &decayKnob.label, &predelayKnob.label, &predelayRateKnob.label, &dampingKnob.label,
                        &gateThreshKnob.label, &gateHoldKnob.label, &gateRateKnob.label, &gateRelKnob.label, &duckingKnob.label,
                        &lowCutKnob.label, &highCutKnob.label, &widthKnob.label, &mixKnob.label })
     {
         lbl->setColour(juce::Label::textColourId, pal.textMain);
     }
 
-    for (auto* sl : { &sizeKnob.slider, &decayKnob.slider, &predelayKnob.slider, &dampingKnob.slider,
+    for (auto* sl : { &sizeKnob.slider, &decayKnob.slider, &predelayKnob.slider, &predelayRateKnob.slider, &dampingKnob.slider,
                       &gateThreshKnob.slider, &gateHoldKnob.slider, &gateRateKnob.slider, &gateRelKnob.slider, &duckingKnob.slider,
                       &lowCutKnob.slider, &highCutKnob.slider, &widthKnob.slider, &mixKnob.slider })
     {
@@ -754,10 +802,12 @@ void SDVerbAudioProcessorEditor::resized()
         const int rowH = col.getHeight() / 2;
         const int halfW = col.getWidth() / 2;
         auto row1 = col.removeFromTop(rowH);
-        placeKnob(sizeKnob,     row1.removeFromLeft(halfW));
-        placeKnob(decayKnob,    row1);
-        placeKnob(predelayKnob, col.removeFromLeft(halfW));
-        placeKnob(dampingKnob,  col);
+        placeKnob(sizeKnob,         row1.removeFromLeft(halfW));
+        placeKnob(decayKnob,        row1);
+        auto pdlyCell = col.removeFromLeft(halfW);
+        placeKnob(predelayKnob,     pdlyCell);
+        placeKnob(predelayRateKnob, pdlyCell);
+        placeKnob(dampingKnob,      col);
     }
 
     // Column 2: GATE & DUCKING (2 toggle buttons + 2x2 knobs)
@@ -779,10 +829,15 @@ void SDVerbAudioProcessorEditor::resized()
         placeKnob(duckingKnob,    col);
     }
 
-    // Column 3: TONE & MIX (2x2 knobs aligned with other columns)
+    // Column 3: TONE & MIX (2 toggle buttons + 2x2 knobs aligned with other columns)
     {
         auto col = juce::Rectangle<int>(ctrlX + colW * 2, ctrlY, colW, ctrlH).reduced(juce::roundToInt(4.0f * scaleX), 0);
-        col.removeFromTop(juce::roundToInt(28.0f * scaleY));
+        auto topBar = col.removeFromTop(juce::roundToInt(24.0f * scaleY));
+        const int halfBtnW = topBar.getWidth() / 2;
+        pdlySyncButton.setBounds(topBar.removeFromLeft(halfBtnW).reduced(2, 0));
+        lofiButton.setBounds(topBar.reduced(2, 0));
+        col.removeFromTop(juce::roundToInt(4.0f * scaleY));
+
         const int rowH = col.getHeight() / 2;
         const int halfW = col.getWidth() / 2;
         auto row1 = col.removeFromTop(rowH);

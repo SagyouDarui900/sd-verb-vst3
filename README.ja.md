@@ -43,7 +43,9 @@ SD-Verb は、C++20 と JUCE 8 で実装された 64bit VST3 / スタンドア�
 | `algo` | Mode | `DENSE`, `METAL` | `DENSE` | 残響アルゴリズムの切替（切替時に内部バッファをゼロクリア） |
 | `size` | Size | `10.0 - 100.0 %` | `35.0 %` | 内部ディレイ長に対する空間サイズ倍率 |
 | `decay` | Decay | `0.05 - 5.00 s` | `0.80 s` | 残響の減衰時間（RT60） |
-| `predelay` | Pre-Delay | `0.0 - 100.0 ms` | `10.0 ms` | 入力信号がリバーブへ到達するまでの遅延時間 |
+| `pdly_sync` | Pre-Delay Sync | `OFF`, `ON` | `OFF` | Pre-Delay の単位を ms と DAW テンポ同期（音価）で切替 |
+| `predelay` | Pre-Delay | `0.0 - 100.0 ms` | `10.0 ms` | 入力信号がリバーブへ到達するまでの遅延時間（同期 OFF 時） |
+| `pdly_rate` | Pre-Delay Rate | `1/64` .. `1/8` | `1/32` | `Pre-Delay Sync` が `ON` のときの音価（上限 `500 ms`） |
 | `damping` | Damping | `0.0 - 100.0 %` | `40.0 %` | 帰還ループ内の高域減衰量（`20 kHz` ～ `1 kHz`） |
 | `in_hpf` | Low Cut | `20 - 1000 Hz` | `120 Hz` | 入力段 2次バターワース HPF のカットオフ周波数 |
 | `in_lpf` | High Cut | `1000 - 20000 Hz` | `12000 Hz` | 入力段 2次バターワース LPF のカットオフ周波数 |
@@ -54,6 +56,7 @@ SD-Verb は、C++20 と JUCE 8 で実装された 64bit VST3 / スタンドア�
 | `gate_rate` | Hold Rate | `1/32` .. `1/8D` | `1/16` | `Hold Sync` が `ON` のときのゲート保持音価 |
 | `gate_rel` | Gate Rel | `5.0 - 300.0 ms` | `30.0 ms` | ホールド終了後にゲートが閉じるまでの減衰時間 |
 | `duck_amount` | Ducking | `0.0 - 100.0 %` | `0.0 %` | 原音入力時に残響を下げる深さ |
+| `lofi_enabled` | Lo-Fi Feedback | `OFF`, `ON` | `OFF` | 帰還ループ内にサンプルレート低減とビット量子化を適用 |
 | `width` | Width | `0.0 - 200.0 %` | `100.0 %` | 残響音の Mid/Side ステレオ幅 |
 | `mix` | Mix | `0.0 - 100.0 %` | `30.0 %` | 原音と残響音のバランス |
 
@@ -81,6 +84,8 @@ SD-Verb は、C++20 と JUCE 8 で実装された 64bit VST3 / スタンドア�
 | 5 | `Drum Snare - Gated Metal` | `METAL` | スネア・クラップ向け。`Hold 120 ms` / `Release 35 ms` の金属的ゲートリバーブ |
 | 6 | `Drum Kit - Tight Room` | `DENSE` | ドラムバス／パーカッション向け。`Size 22 %` / `Decay 0.38 s` の短い空間 |
 | 7 | `SE / Synth Hit - Metallic Tail` | `METAL` | 単発 SE・ヒット音向け。`Size 78 %` / `Decay 2.40 s` の金属的残響 |
+| 8 | `Main Lead - 1/16 Sync Pre-Delay` | `DENSE` | リズミカルな主旋律向け。16分音符同期 Pre-Delay ＋ `Ducking 40 %` |
+| 9 | `SE / Retro - Lo-Fi Metal` | `METAL` | レトロゲーム・低ビット風質感。`LO-FI` 帰還 ＋ `1/16T` 同期ゲート |
 
 ---
 

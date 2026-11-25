@@ -43,7 +43,9 @@ SD-Verb is a 64-bit VST3 and Standalone audio reverb plugin written in C++20 and
 | `algo` | Mode | `DENSE`, `METAL` | `DENSE` | Reverb algorithm selection (flushes delay buffers on switch) |
 | `size` | Size | `10.0 - 100.0 %` | `35.0 %` | Room size scaling factor applied to internal delay lengths |
 | `decay` | Decay | `0.05 - 5.00 s` | `0.80 s` | RT60 decay time |
-| `predelay` | Pre-Delay | `0.0 - 100.0 ms` | `10.0 ms` | Delay before input reaches the reverb core |
+| `pdly_sync` | Pre-Delay Sync | `OFF`, `ON` | `OFF` | Switches pre-delay between milliseconds and DAW tempo |
+| `predelay` | Pre-Delay | `0.0 - 100.0 ms` | `10.0 ms` | Delay before input reaches the reverb core (`Pre-Delay Sync` OFF) |
+| `pdly_rate` | Pre-Delay Rate | `1/64` .. `1/8` | `1/32` | Note value for pre-delay when `Pre-Delay Sync` is `ON` (clamped to `500 ms`) |
 | `damping` | Damping | `0.0 - 100.0 %` | `40.0 %` | Feedback loop high-frequency damping (`20 kHz` to `1 kHz`) |
 | `in_hpf` | Low Cut | `20 - 1000 Hz` | `120 Hz` | Input 2nd-order Butterworth high-pass filter cutoff |
 | `in_lpf` | High Cut | `1000 - 20000 Hz` | `12000 Hz` | Input 2nd-order Butterworth low-pass filter cutoff |
@@ -54,6 +56,7 @@ SD-Verb is a 64-bit VST3 and Standalone audio reverb plugin written in C++20 and
 | `gate_rate` | Hold Rate | `1/32` .. `1/8D` | `1/16` | Note value for gate hold when `Hold Sync` is `ON` |
 | `gate_rel` | Gate Rel | `5.0 - 300.0 ms` | `30.0 ms` | Gate release time after hold expires |
 | `duck_amount` | Ducking | `0.0 - 100.0 %` | `0.0 %` | Attenuation depth applied to wet signal during dry input |
+| `lofi_enabled` | Lo-Fi Feedback | `OFF`, `ON` | `OFF` | Applies sample-rate reduction and bit quantization inside the feedback loop |
 | `width` | Width | `0.0 - 200.0 %` | `100.0 %` | Mid/Side stereo width of the wet signal |
 | `mix` | Mix | `0.0 - 100.0 %` | `30.0 %` | Dry/Wet balance |
 
@@ -81,6 +84,8 @@ Select presets from the top-right dropdown menu in the plugin window or from the
 | 5 | `Drum Snare - Gated Metal` | `METAL` | Snare and claps; metallic tail cut by a `120 ms` hold / `35 ms` release gate |
 | 6 | `Drum Kit - Tight Room` | `DENSE` | Drum bus and percussion; `22 %` size and `0.38 s` decay |
 | 7 | `SE / Synth Hit - Metallic Tail` | `METAL` | One-shot hits and sound effects; `78 %` size and `2.40 s` decay |
+| 8 | `Main Lead - 1/16 Sync Pre-Delay` | `DENSE` | Rhythmic lead; `1/16` tempo-synced pre-delay with `40 %` ducking |
+| 9 | `SE / Retro - Lo-Fi Metal` | `METAL` | Retro game / low-bitrate texture; `LO-FI` feedback with `1/16T` gated tail |
 
 ---
 

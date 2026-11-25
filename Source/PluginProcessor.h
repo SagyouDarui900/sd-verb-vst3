@@ -103,6 +103,7 @@ public:
 
 private:
     static float getRateBeats(int rateIndex) noexcept;
+    static float getPreDelayRateBeats(int rateIndex) noexcept;
 
     juce::AudioProcessorValueTreeState apvts;
 
@@ -110,7 +111,9 @@ private:
     std::atomic<float>* algoParam        = nullptr;
     std::atomic<float>* sizeParam        = nullptr;
     std::atomic<float>* decayParam       = nullptr;
+    std::atomic<float>* pdlySyncParam    = nullptr;
     std::atomic<float>* predelayParam    = nullptr;
+    std::atomic<float>* pdlyRateParam    = nullptr;
     std::atomic<float>* dampingParam     = nullptr;
     std::atomic<float>* inHpfParam       = nullptr;
     std::atomic<float>* inLpfParam       = nullptr;
@@ -121,6 +124,7 @@ private:
     std::atomic<float>* gateRateParam    = nullptr;
     std::atomic<float>* gateRelParam     = nullptr;
     std::atomic<float>* duckAmountParam  = nullptr;
+    std::atomic<float>* lofiEnabledParam = nullptr;
     std::atomic<float>* widthParam       = nullptr;
     std::atomic<float>* mixParam         = nullptr;
 

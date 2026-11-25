@@ -99,7 +99,7 @@ private:
     // Column 1: SPACE CORE (2-segment Mode buttons + 2x2 knobs)
     juce::TextButton denseModeButton { "DENSE" };
     juce::TextButton metalModeButton { "METAL" };
-    LabeledKnob sizeKnob, decayKnob, predelayKnob, dampingKnob;
+    LabeledKnob sizeKnob, decayKnob, predelayKnob, predelayRateKnob, dampingKnob;
 
     // Column 2: GATE & DUCKING
     juce::TextButton gateActiveButton { "GATE OFF" };
@@ -107,11 +107,15 @@ private:
     LabeledKnob gateThreshKnob, gateHoldKnob, gateRateKnob, gateRelKnob, duckingKnob;
 
     // Column 3: TONE & MIX
+    juce::TextButton pdlySyncButton   { "PDLY: OFF" };
+    juce::TextButton lofiButton       { "LO-FI: OFF" };
     LabeledKnob lowCutKnob, highCutKnob, widthKnob, mixKnob;
 
     // Button attachments
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> gateActiveAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> holdSyncAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> pdlySyncAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> lofiAttachment;
 
     // Cached Y2K honeycomb clusters & geometric vector decor
     juce::Path sidebarDecorStrokePath;

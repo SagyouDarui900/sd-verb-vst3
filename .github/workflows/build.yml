@@ -23,7 +23,7 @@ jobs:
         run: git clone --depth 1 --branch 8.0.9 https://github.com/juce-framework/JUCE.git JUCE
 
       - name: Configure CMake
-        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+        run: cmake -S . -B build -A x64
 
       - name: Build Release (VST3 & Standalone)
         run: cmake --build build --config Release -- /nr:false /m:1

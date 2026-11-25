@@ -1,0 +1,19 @@
+# Build directories
+build/
+out/
+dist/
+cmake-build-*/
+*.zip
+
+# External SDK (cloned separately via CMake setup instructions)
+JUCE/
+
+# IDE / OS files
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln
+*.vcxproj*
+.DS_Store
+Thumbs.db
